@@ -1,0 +1,5 @@
+.DS_Store
+.idea
+*.iml
+bbb.mp4
+cmake-build-debug
