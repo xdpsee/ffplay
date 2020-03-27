@@ -56,7 +56,7 @@
 #include "libavutil/version.h"
 #include "cmdutils.h"
 #if CONFIG_NETWORK
-#include "libavformat/network.h"
+#include "libavformat/avio.h"
 #endif
 #if HAVE_SYS_RESOURCE_H
 #include <sys/time.h>
@@ -1879,7 +1879,7 @@ static void show_help_protocol(const char *name)
         return;
     }
 
-    // TODO: 先屏蔽， 链接失败
+    // TODO: 先屏蔽， avio_protocol_get_class
 //    proto_class = avio_protocol_get_class(name);
 //    if (!proto_class) {
 //        av_log(NULL, AV_LOG_ERROR, "Unknown protocol '%s'.\n", name);

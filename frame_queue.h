@@ -2,11 +2,6 @@
 #define __PLAYGROUND_FRAME_QUEUE_H
 
 
-#include "config.h"
-#include <inttypes.h>
-#include <math.h>
-#include <limits.h>
-#include <signal.h>
 #include <stdint.h>
 
 #include "libavutil/rational.h"

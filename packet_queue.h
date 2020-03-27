@@ -1,11 +1,6 @@
 #ifndef __PLAYGROUND_PACKET_QUEUE_H
 #define __PLAYGROUND_PACKET_QUEUE_H
 
-#include "config.h"
-#include <inttypes.h>
-#include <math.h>
-#include <limits.h>
-#include <signal.h>
 #include <stdint.h>
 
 #include "libavcodec/avcodec.h"
