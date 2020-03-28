@@ -8,13 +8,13 @@ int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_la
 
     err = pthread_mutex_init(&f->mutex, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): error");
+        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): %s\n", strerror(err));
         return AVERROR(ENOMEM);
     }
 
     err = pthread_cond_init(&f->cond, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): error");
+        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): %s\n", strerror(err));
         return AVERROR(ENOMEM);
     }
     f->pktq = pktq;

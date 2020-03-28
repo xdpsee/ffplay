@@ -237,7 +237,7 @@ static int is_realtime(AVFormatContext *s) {
 
 static int read_thread(void *arg);
 
-MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
+MediaState *stream_open(const char *filename, AVInputFormat *input_format) {
     MediaState *is;
 
     is = av_mallocz(sizeof(MediaState));
@@ -246,7 +246,7 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
     is->filename = av_strdup(filename);
     if (!is->filename)
         goto fail;
-    is->input_format = iformat;
+    is->input_format = input_format;
     is->ytop = 0;
     is->xleft = 0;
 
@@ -265,7 +265,7 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
 
     int err = pthread_cond_init(&is->continue_read_thread, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): error\n");
+        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): %s\n", strerror(err));
         goto fail;
     }
 
@@ -282,7 +282,6 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
     is->audio_volume = startup_volume;
     is->muted = 0;
     is->av_sync_type = av_sync_type;
-    //is->read_tid = SDL_CreateThread(read_thread, "read_thread", is);
     err = pthread_create(&is->read_tid, NULL, read_thread, is);
     if (err) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
@@ -1687,9 +1686,11 @@ static int read_thread(void *arg) {
     int scan_all_pmts_set = 0;
     int64_t pkt_ts;
 
+    pthread_setname_np("read_thread");
+
     err = pthread_mutex_init(&wait_mutex, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): error\n");
         ret = AVERROR(ENOMEM);
         goto fail;
     }

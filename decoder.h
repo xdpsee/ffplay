@@ -27,7 +27,7 @@ typedef struct Decoder {
 
 extern void decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, pthread_cond_t *empty_queue_cond);
 
-extern int decoder_start(Decoder *d, int (*fn)(void *), const char *thread_name, void *arg);
+extern int decoder_start(Decoder *d, int (*thread_func)(void *), const char *thread_name, void *arg);
 
 extern int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub);
 

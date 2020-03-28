@@ -138,7 +138,7 @@ typedef struct MediaState {
     pthread_cond_t continue_read_thread;
 } MediaState;
 
-extern MediaState* stream_open(const char *filename, AVInputFormat *iformat);
+extern MediaState* stream_open(const char *filename, AVInputFormat *input_format);
 
 extern void stream_close(MediaState *is);
 

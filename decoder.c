@@ -13,14 +13,17 @@ void decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, pthread
     d->pkt_serial = -1;
 }
 
-int decoder_start(Decoder *d, int (*fn)(void *), const char *thread_name, void* arg)
+int decoder_start(Decoder *d, int (*thread_proc)(void *), const char *thread_name, void* arg)
 {
     packet_queue_start(d->queue);
-    int err = pthread_create(&d->decoder_tid, NULL, fn, arg);
+    int err = pthread_create(&d->decoder_tid, NULL, thread_proc, arg);
     if (err) {
-        av_log(NULL, AV_LOG_ERROR, "pthread_create(): error");
+        av_log(NULL, AV_LOG_ERROR, "pthread_create(): %s\n", strerror(err));
         return AVERROR(ENOMEM);
     }
+
+    // TODO: set thread name
+
     return 0;
 }
 
