@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 
+#include <pthread.h>
 #include "libavformat/avformat.h"
 #include "libavcodec/avfft.h"
 
@@ -34,7 +35,7 @@ typedef struct AudioParams {
 
 
 typedef struct MediaState {
-    SDL_Thread *read_tid;
+    pthread_t read_tid;
     AVInputFormat *input_format;
     int abort_request;
     int force_refresh;

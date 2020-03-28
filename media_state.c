@@ -265,7 +265,7 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
 
     int err = pthread_cond_init(&is->continue_read_thread, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): error\n");
         goto fail;
     }
 
@@ -282,13 +282,15 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
     is->audio_volume = startup_volume;
     is->muted = 0;
     is->av_sync_type = av_sync_type;
-    is->read_tid = SDL_CreateThread(read_thread, "read_thread", is);
-    if (!is->read_tid) {
+    //is->read_tid = SDL_CreateThread(read_thread, "read_thread", is);
+    err = pthread_create(&is->read_tid, NULL, read_thread, is);
+    if (err) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
         fail:
         stream_close(is);
         return NULL;
     }
+
     return is;
 }
 
@@ -459,7 +461,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
 void stream_close(MediaState *is) {
     /* XXX: use a special url_shutdown call to abort parse cleanly */
     is->abort_request = 1;
-    SDL_WaitThread(is->read_tid, NULL);
+    pthread_join(is->read_tid, NULL);
 
     /* close each stream */
     if (is->audio_stream >= 0)
@@ -1926,7 +1928,7 @@ static int read_thread(void *arg) {
             /* wait 10 ms */
             pthread_mutex_lock(&wait_mutex);
             struct timespec timeout = {0, 0};
-            timeout.tv_sec = 10 * 1000 * 1000; //10ms
+            timeout.tv_nsec = 10 * 1000 * 1000; //10ms
             pthread_cond_timedwait(&is->continue_read_thread, &wait_mutex, &timeout);
             pthread_mutex_unlock(&wait_mutex);
             continue;
@@ -1958,7 +1960,7 @@ static int read_thread(void *arg) {
                 break;
             pthread_mutex_lock(&wait_mutex);
             struct timespec timeout = {0, 0};
-            timeout.tv_sec = 10 * 1000 * 1000; //10ms
+            timeout.tv_nsec = 10 * 1000 * 1000; //10ms
             pthread_cond_timedwait(&is->continue_read_thread, &wait_mutex, &timeout);
             pthread_mutex_unlock(&wait_mutex);
             continue;
