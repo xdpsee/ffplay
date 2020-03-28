@@ -253,9 +253,9 @@ static void event_loop(MediaState *cur_stream) {
                         if (seek_by_bytes) {
                             pos = -1;
                             if (pos < 0 && cur_stream->video_stream >= 0)
-                                pos = frame_queue_last_pos(&cur_stream->pictq);
+                                pos = frame_queue_last_pos(&cur_stream->pic_q);
                             if (pos < 0 && cur_stream->audio_stream >= 0)
-                                pos = frame_queue_last_pos(&cur_stream->sampq);
+                                pos = frame_queue_last_pos(&cur_stream->sample_q);
                             if (pos < 0)
                                 pos = avio_tell(cur_stream->ic->pb);
                             if (cur_stream->ic->bit_rate)

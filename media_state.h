@@ -35,7 +35,7 @@ typedef struct AudioParams {
 
 typedef struct MediaState {
     SDL_Thread *read_tid;
-    AVInputFormat *iformat;
+    AVInputFormat *input_format;
     int abort_request;
     int force_refresh;
     int paused;
@@ -49,17 +49,17 @@ typedef struct MediaState {
     AVFormatContext *ic;
     int realtime;
 
-    Clock audclk;
-    Clock vidclk;
-    Clock extclk;
+    Clock audio_clk;
+    Clock video_clk;
+    Clock ext_clk;
 
-    FrameQueue pictq;
-    FrameQueue subpq;
-    FrameQueue sampq;
+    FrameQueue pic_q;
+    FrameQueue sub_pic_q;
+    FrameQueue sample_q;
 
-    Decoder auddec;
-    Decoder viddec;
-    Decoder subdec;
+    Decoder audio_dec;
+    Decoder video_dec;
+    Decoder subtitle_dec;
 
     int audio_stream;
 
@@ -72,7 +72,7 @@ typedef struct MediaState {
     double audio_diff_threshold;
     int audio_diff_avg_count;
     AVStream *audio_st;
-    PacketQueue audioq;
+    PacketQueue audio_q;
     int audio_hw_buf_size;
     uint8_t *audio_buf;
     uint8_t *audio_buf1;
@@ -106,14 +106,14 @@ typedef struct MediaState {
 
     int subtitle_stream;
     AVStream *subtitle_st;
-    PacketQueue subtitleq;
+    PacketQueue subtitle_q;
 
     double frame_timer;
     double frame_last_returned_time;
     double frame_last_filter_delay;
     int video_stream;
     AVStream *video_st;
-    PacketQueue videoq;
+    PacketQueue video_q;
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *img_convert_ctx;
     struct SwsContext *sub_convert_ctx;
