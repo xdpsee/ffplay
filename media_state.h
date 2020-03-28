@@ -134,7 +134,7 @@ typedef struct MediaState {
 
     int last_video_stream, last_audio_stream, last_subtitle_stream;
 
-    SDL_cond *continue_read_thread;
+    pthread_cond_t continue_read_thread;
 } MediaState;
 
 extern MediaState* stream_open(const char *filename, AVInputFormat *iformat);

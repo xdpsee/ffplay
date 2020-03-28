@@ -263,7 +263,8 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
         packet_queue_init(&is->subtitle_q) < 0)
         goto fail;
 
-    if (!(is->continue_read_thread = SDL_CreateCond())) {
+    int err = pthread_cond_init(&is->continue_read_thread, NULL);
+    if (err) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
         goto fail;
     }
@@ -294,7 +295,7 @@ MediaState *stream_open(const char *filename, AVInputFormat *iformat) {
 /* open a given stream. Return 0 if OK */
 static int stream_component_open(MediaState *is, int stream_index) {
     AVFormatContext *ic = is->ic;
-    AVCodecContext *avctx;
+    AVCodecContext *context;
     AVCodec *codec;
     const char *forced_codec_name = NULL;
     AVDictionary *opts = NULL;
@@ -302,23 +303,23 @@ static int stream_component_open(MediaState *is, int stream_index) {
     int sample_rate, nb_channels;
     int64_t channel_layout;
     int ret = 0;
-    int stream_lowres = low_res;
+    int stream_low_res = low_res;
 
     if (stream_index < 0 || stream_index >= ic->nb_streams)
         return -1;
 
-    avctx = avcodec_alloc_context3(NULL);
-    if (!avctx)
+    context = avcodec_alloc_context3(NULL);
+    if (!context)
         return AVERROR(ENOMEM);
 
-    ret = avcodec_parameters_to_context(avctx, ic->streams[stream_index]->codecpar);
+    ret = avcodec_parameters_to_context(context, ic->streams[stream_index]->codecpar);
     if (ret < 0)
         goto fail;
-    avctx->pkt_timebase = ic->streams[stream_index]->time_base;
+    context->pkt_timebase = ic->streams[stream_index]->time_base;
 
-    codec = avcodec_find_decoder(avctx->codec_id);
+    codec = avcodec_find_decoder(context->codec_id);
 
-    switch (avctx->codec_type) {
+    switch (context->codec_type) {
         case AVMEDIA_TYPE_AUDIO   :
             is->last_audio_stream = stream_index;
             forced_codec_name = audio_codec_name;
@@ -340,30 +341,30 @@ static int stream_component_open(MediaState *is, int stream_index) {
                    "No codec could be found with name '%s'\n", forced_codec_name);
         else
             av_log(NULL, AV_LOG_WARNING,
-                   "No decoder could be found for codec %s\n", avcodec_get_name(avctx->codec_id));
+                   "No decoder could be found for codec %s\n", avcodec_get_name(context->codec_id));
         ret = AVERROR(EINVAL);
         goto fail;
     }
 
-    avctx->codec_id = codec->id;
-    if (stream_lowres > codec->max_lowres) {
-        av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
+    context->codec_id = codec->id;
+    if (stream_low_res > codec->max_lowres) {
+        av_log(context, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
                codec->max_lowres);
-        stream_lowres = codec->max_lowres;
+        stream_low_res = codec->max_lowres;
     }
-    avctx->lowres = stream_lowres;
+    context->lowres = stream_low_res;
 
     if (fast)
-        avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+        context->flags2 |= AV_CODEC_FLAG2_FAST;
 
-    opts = filter_codec_opts(codec_opts, avctx->codec_id, ic, ic->streams[stream_index], codec);
+    opts = filter_codec_opts(codec_opts, context->codec_id, ic, ic->streams[stream_index], codec);
     if (!av_dict_get(opts, "threads", NULL, 0))
         av_dict_set(&opts, "threads", "auto", 0);
-    if (stream_lowres)
-        av_dict_set_int(&opts, "lowres", stream_lowres, 0);
-    if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
+    if (stream_low_res)
+        av_dict_set_int(&opts, "lowres", stream_low_res, 0);
+    if (context->codec_type == AVMEDIA_TYPE_VIDEO || context->codec_type == AVMEDIA_TYPE_AUDIO)
         av_dict_set(&opts, "refcounted_frames", "1", 0);
-    if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
+    if ((ret = avcodec_open2(context, codec, &opts)) < 0) {
         goto fail;
     }
     if ((t = av_dict_get(opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
@@ -374,16 +375,16 @@ static int stream_component_open(MediaState *is, int stream_index) {
 
     is->eof = 0;
     ic->streams[stream_index]->discard = AVDISCARD_DEFAULT;
-    switch (avctx->codec_type) {
+    switch (context->codec_type) {
         case AVMEDIA_TYPE_AUDIO:
 #if CONFIG_AVFILTER
         {
             AVFilterContext *sink;
 
-            is->audio_filter_src.freq = avctx->sample_rate;
-            is->audio_filter_src.channels = avctx->channels;
-            is->audio_filter_src.channel_layout = get_valid_channel_layout(avctx->channel_layout, avctx->channels);
-            is->audio_filter_src.fmt = avctx->sample_fmt;
+            is->audio_filter_src.freq = context->sample_rate;
+            is->audio_filter_src.channels = context->channels;
+            is->audio_filter_src.channel_layout = get_valid_channel_layout(context->channel_layout, context->channels);
+            is->audio_filter_src.fmt = context->sample_fmt;
             if ((ret = configure_audio_filters(is, afilters, 0)) < 0)
                 goto fail;
             sink = is->out_audio_filter;
@@ -392,9 +393,9 @@ static int stream_component_open(MediaState *is, int stream_index) {
             channel_layout = av_buffersink_get_channel_layout(sink);
         }
 #else
-        sample_rate    = avctx->sample_rate;
-            nb_channels    = avctx->channels;
-            channel_layout = avctx->channel_layout;
+        sample_rate    = context->sample_rate;
+            nb_channels    = context->channels;
+            channel_layout = context->channel_layout;
 #endif
 
             /* prepare audio output */
@@ -415,7 +416,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
             is->audio_stream = stream_index;
             is->audio_st = ic->streams[stream_index];
 
-            decoder_init(&is->audio_dec, avctx, &is->audio_q, is->continue_read_thread);
+            decoder_init(&is->audio_dec, context, &is->audio_q, &is->continue_read_thread);
             if ((is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) &&
                 !is->ic->iformat->read_seek) {
                 is->audio_dec.start_pts = is->audio_st->start_time;
@@ -429,7 +430,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
             is->video_stream = stream_index;
             is->video_st = ic->streams[stream_index];
 
-            decoder_init(&is->video_dec, avctx, &is->video_q, is->continue_read_thread);
+            decoder_init(&is->video_dec, context, &is->video_q, &is->continue_read_thread);
             if ((ret = decoder_start(&is->video_dec, video_thread, "video_decoder", is)) < 0)
                 goto out;
             is->queue_attachments_req = 1;
@@ -438,7 +439,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
             is->subtitle_stream = stream_index;
             is->subtitle_st = ic->streams[stream_index];
 
-            decoder_init(&is->subtitle_dec, avctx, &is->subtitle_q, is->continue_read_thread);
+            decoder_init(&is->subtitle_dec, context, &is->subtitle_q, &is->continue_read_thread);
             if ((ret = decoder_start(&is->subtitle_dec, subtitle_thread, "subtitle_decoder", is)) < 0)
                 goto out;
             break;
@@ -448,7 +449,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
     goto out;
 
     fail:
-    avcodec_free_context(&avctx);
+    avcodec_free_context(&context);
     out:
     av_dict_free(&opts);
 
@@ -478,7 +479,7 @@ void stream_close(MediaState *is) {
     frame_queue_destroy(&is->pic_q);
     frame_queue_destroy(&is->sample_q);
     frame_queue_destroy(&is->sub_pic_q);
-    SDL_DestroyCond(is->continue_read_thread);
+    pthread_cond_destroy(&is->continue_read_thread);
     sws_freeContext(is->img_convert_ctx);
     sws_freeContext(is->sub_convert_ctx);
     av_free(is->filename);
@@ -605,7 +606,7 @@ void stream_seek(MediaState *is, int64_t pos, int64_t rel, int seek_by_bytes) {
         if (seek_by_bytes)
             is->seek_flags |= AVSEEK_FLAG_BYTE;
         is->seek_req = 1;
-        SDL_CondSignal(is->continue_read_thread);
+        pthread_cond_signal(&is->continue_read_thread);
     }
 }
 
@@ -844,8 +845,8 @@ void video_refresh(void *opaque, double *remaining_time) {
                    aqsize / 1024,
                    vqsize / 1024,
                    sqsize,
-                   is->video_st ? is->video_dec.avctx->pts_correction_num_faulty_dts : 0,
-                   is->video_st ? is->video_dec.avctx->pts_correction_num_faulty_pts : 0);
+                   is->video_st ? is->video_dec.context->pts_correction_num_faulty_dts : 0,
+                   is->video_st ? is->video_dec.context->pts_correction_num_faulty_pts : 0);
             fflush(stdout);
             last_time = cur_time;
         }
@@ -1356,8 +1357,8 @@ static int subtitle_thread(void *arg) {
                 pts = sp->sub.pts / (double) AV_TIME_BASE;
             sp->pts = pts;
             sp->serial = is->subtitle_dec.pkt_serial;
-            sp->width = is->subtitle_dec.avctx->width;
-            sp->height = is->subtitle_dec.avctx->height;
+            sp->width = is->subtitle_dec.context->width;
+            sp->height = is->subtitle_dec.context->height;
             sp->uploaded = 0;
 
             /* now we can update the picture count */
@@ -1680,11 +1681,12 @@ static int read_thread(void *arg) {
     int64_t stream_start_time;
     int pkt_in_play_range = 0;
     AVDictionaryEntry *t;
-    SDL_mutex *wait_mutex = SDL_CreateMutex();
+    pthread_mutex_t wait_mutex;
     int scan_all_pmts_set = 0;
     int64_t pkt_ts;
 
-    if (!wait_mutex) {
+    err = pthread_mutex_init(&wait_mutex, NULL);
+    if (err) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
         ret = AVERROR(ENOMEM);
         goto fail;
@@ -1922,9 +1924,11 @@ static int read_thread(void *arg) {
                  stream_has_enough_packets(is->video_st, is->video_stream, &is->video_q) &&
                  stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitle_q)))) {
             /* wait 10 ms */
-            SDL_LockMutex(wait_mutex);
-            SDL_CondWaitTimeout(is->continue_read_thread, wait_mutex, 10);
-            SDL_UnlockMutex(wait_mutex);
+            pthread_mutex_lock(&wait_mutex);
+            struct timespec timeout = {0, 0};
+            timeout.tv_sec = 10 * 1000 * 1000; //10ms
+            pthread_cond_timedwait(&is->continue_read_thread, &wait_mutex, &timeout);
+            pthread_mutex_unlock(&wait_mutex);
             continue;
         }
         if (!is->paused &&
@@ -1952,9 +1956,11 @@ static int read_thread(void *arg) {
             }
             if (ic->pb && ic->pb->error)
                 break;
-            SDL_LockMutex(wait_mutex);
-            SDL_CondWaitTimeout(is->continue_read_thread, wait_mutex, 10);
-            SDL_UnlockMutex(wait_mutex);
+            pthread_mutex_lock(&wait_mutex);
+            struct timespec timeout = {0, 0};
+            timeout.tv_sec = 10 * 1000 * 1000; //10ms
+            pthread_cond_timedwait(&is->continue_read_thread, &wait_mutex, &timeout);
+            pthread_mutex_unlock(&wait_mutex);
             continue;
         } else {
             is->eof = 0;
@@ -1991,7 +1997,7 @@ static int read_thread(void *arg) {
         event.user.data1 = is;
         SDL_PushEvent(&event);
     }
-    SDL_DestroyMutex(wait_mutex);
+    pthread_mutex_destroy(&wait_mutex);
     return 0;
 }
 
