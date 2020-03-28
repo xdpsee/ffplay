@@ -109,10 +109,6 @@ typedef struct MediaState {
     int xpos;
     double last_vis_time;
 
-    SDL_Texture *vis_texture;
-    SDL_Texture *sub_texture;
-    SDL_Texture *vid_texture;
-
     int subtitle_stream;
     AVStream *subtitle_st;
     PacketQueue subtitle_q;

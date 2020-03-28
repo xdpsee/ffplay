@@ -33,6 +33,7 @@
 #include "opts.h"
 #include "enums.h"
 #include "media_state.h"
+#include "utils.h"
 
 
 static void fill_rectangle(int x, int y, int w, int h);
@@ -134,9 +135,16 @@ AVPacket flush_pkt;
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 
+/**
+ * SDL Video
+ */
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_RendererInfo renderer_info = {0};
+
+SDL_Texture *vis_texture;
+SDL_Texture *sub_texture;
+SDL_Texture *vid_texture;
 
 static const struct TextureFormatEntry {
     enum AVPixelFormat format;
@@ -392,9 +400,9 @@ static void event_loop(MediaState *cur_stream) {
                     case SDL_WINDOWEVENT_SIZE_CHANGED:
                         screen_width = cur_stream->width = event.window.data1;
                         screen_height = cur_stream->height = event.window.data2;
-                        if (cur_stream->vis_texture) {
-                            SDL_DestroyTexture(cur_stream->vis_texture);
-                            cur_stream->vis_texture = NULL;
+                        if (vis_texture) {
+                            SDL_DestroyTexture(vis_texture);
+                            vis_texture = NULL;
                         }
                     case SDL_WINDOWEVENT_EXPOSED:
                         cur_stream->force_refresh = 1;
@@ -715,11 +723,11 @@ void video_refresh(void *opaque, double *remaining_time) {
                                 uint8_t *pixels;
                                 int pitch, j;
 
-                                if (!SDL_LockTexture(is->sub_texture, (SDL_Rect *) sub_rect, (void **) &pixels,
+                                if (!SDL_LockTexture(sub_texture, (SDL_Rect *) sub_rect, (void **) &pixels,
                                                      &pitch)) {
                                     for (j = 0; j < sub_rect->h; j++, pixels += pitch)
                                         memset(pixels, 0, sub_rect->w << 2);
-                                    SDL_UnlockTexture(is->sub_texture);
+                                    SDL_UnlockTexture(sub_texture);
                                 }
                             }
                         }
@@ -905,7 +913,7 @@ static void video_audio_display(MediaState *s) {
             fill_rectangle(s->xleft, y, s->width, 1);
         }
     } else {
-        if (realloc_texture(&s->vis_texture, SDL_PIXELFORMAT_ARGB8888, s->width, s->height, SDL_BLENDMODE_NONE, 1) < 0)
+        if (realloc_texture(&vis_texture, SDL_PIXELFORMAT_ARGB8888, s->width, s->height, SDL_BLENDMODE_NONE, 1) < 0)
             return;
 
         nb_display_channels = FFMIN(nb_display_channels, 2);
@@ -938,7 +946,7 @@ static void video_audio_display(MediaState *s) {
             }
             /* Least efficient way to do this, we should of course
              * directly access it but it is more than fast enough. */
-            if (!SDL_LockTexture(s->vis_texture, &rect, (void **) &pixels, &pitch)) {
+            if (!SDL_LockTexture(vis_texture, &rect, (void **) &pixels, &pitch)) {
                 pitch >>= 2;
                 pixels += pitch * s->height;
                 for (y = 0; y < s->height; y++) {
@@ -952,9 +960,9 @@ static void video_audio_display(MediaState *s) {
                     pixels -= pitch;
                     *pixels = (a << 16) + (b << 8) + ((a + b) >> 1);
                 }
-                SDL_UnlockTexture(s->vis_texture);
+                SDL_UnlockTexture(vis_texture);
             }
-            SDL_RenderCopy(renderer, s->vis_texture, NULL, NULL);
+            SDL_RenderCopy(renderer, vis_texture, NULL, NULL);
         }
         if (!s->paused)
             s->xpos++;
@@ -983,7 +991,7 @@ void video_image_display(MediaState *is) {
                         sp->width = vp->width;
                         sp->height = vp->height;
                     }
-                    if (realloc_texture(&is->sub_texture, SDL_PIXELFORMAT_ARGB8888, sp->width, sp->height,
+                    if (realloc_texture(&sub_texture, SDL_PIXELFORMAT_ARGB8888, sp->width, sp->height,
                                         SDL_BLENDMODE_BLEND, 1) < 0)
                         return;
 
@@ -1003,10 +1011,10 @@ void video_image_display(MediaState *is) {
                             av_log(NULL, AV_LOG_FATAL, "Cannot initialize the conversion context\n");
                             return;
                         }
-                        if (!SDL_LockTexture(is->sub_texture, (SDL_Rect *) sub_rect, (void **) pixels, pitch)) {
+                        if (!SDL_LockTexture(sub_texture, (SDL_Rect *) sub_rect, (void **) pixels, pitch)) {
                             sws_scale(is->sub_convert_ctx, (const uint8_t *const *) sub_rect->data, sub_rect->linesize,
                                       0, sub_rect->h, pixels, pitch);
-                            SDL_UnlockTexture(is->sub_texture);
+                            SDL_UnlockTexture(sub_texture);
                         }
                     }
                     sp->uploaded = 1;
@@ -1020,7 +1028,7 @@ void video_image_display(MediaState *is) {
 
     if (!vp->uploaded) {
         int upload_texture(SDL_Texture **tex, AVFrame *frame, struct SwsContext **img_convert_ctx);
-        if (upload_texture(&is->vid_texture, vp->frame, &is->img_convert_ctx) < 0) {
+        if (upload_texture(&vid_texture, vp->frame, &is->img_convert_ctx) < 0) {
             return;
         }
         vp->uploaded = 1;
@@ -1028,11 +1036,11 @@ void video_image_display(MediaState *is) {
     }
 
     set_sdl_yuv_conversion_mode(vp->frame);
-    SDL_RenderCopyEx(renderer, is->vid_texture, NULL, &rect, 0, NULL, vp->flip_v ? SDL_FLIP_VERTICAL : 0);
+    SDL_RenderCopyEx(renderer, vid_texture, NULL, &rect, 0, NULL, vp->flip_v ? SDL_FLIP_VERTICAL : 0);
     set_sdl_yuv_conversion_mode(NULL);
     if (sp) {
 #if USE_ONEPASS_SUBTITLE_RENDER
-        SDL_RenderCopy(renderer, is->sub_texture, NULL, &rect);
+        SDL_RenderCopy(renderer, sub_texture, NULL, &rect);
 #else
         int i;
         double xratio = (double) rect.w / (double) sp->width;
@@ -1177,6 +1185,17 @@ void fill_rectangle(int x, int y, int w, int h) {
     if (w && h) {
         SDL_RenderFillRect(renderer, &rect);
     }
+}
+
+void media_state_stream_close() {
+
+    if (vis_texture)
+        SDL_DestroyTexture(vis_texture);
+    if (vid_texture)
+        SDL_DestroyTexture(vid_texture);
+    if (sub_texture)
+        SDL_DestroyTexture(sub_texture);
+
 }
 
 /**
