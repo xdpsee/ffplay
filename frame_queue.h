@@ -14,10 +14,10 @@
 #include "packet_queue.h"
 
 #define VIDEO_PICTURE_QUEUE_SIZE 3
-#define SUBPICTURE_QUEUE_SIZE 16
+#define SUB_PICTURE_QUEUE_SIZE 16
 #define SAMPLE_QUEUE_SIZE 9
 
-#define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE, SUBPICTURE_QUEUE_SIZE))
+#define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE, SUB_PICTURE_QUEUE_SIZE))
 
 /* Common struct for handling all types of decoded data and allocated render buffers. */
 typedef struct Frame {
