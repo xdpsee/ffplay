@@ -49,11 +49,9 @@ typedef struct FrameQueue {
 } FrameQueue;
 
 
-extern void frame_queue_unref_item(Frame *vp);
-
 extern int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last);
 
-extern void frame_queue_destory(FrameQueue *f);
+extern void frame_queue_destroy(FrameQueue *f);
 
 extern void frame_queue_signal(FrameQueue *f);
 
@@ -73,6 +71,8 @@ extern void frame_queue_next(FrameQueue *f);
 
 /* return the number of undisplayed frames in the queue */
 extern int frame_queue_nb_remaining(FrameQueue *f);
+
+extern void frame_queue_unref_item(Frame *vp);
 
 /* return last shown position */
 extern int64_t frame_queue_last_pos(FrameQueue *f);

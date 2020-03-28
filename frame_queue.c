@@ -1,12 +1,6 @@
 #include "frame_queue.h"
 
 
-void frame_queue_unref_item(Frame *vp)
-{
-    av_frame_unref(vp->frame);
-    avsubtitle_free(&vp->sub);
-}
-
 int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last)
 {
     int i;
@@ -28,7 +22,7 @@ int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_la
     return 0;
 }
 
-void frame_queue_destory(FrameQueue *f)
+void frame_queue_destroy(FrameQueue *f)
 {
     int i;
     for (i = 0; i < f->max_size; i++) {
@@ -123,6 +117,12 @@ void frame_queue_next(FrameQueue *f)
 int frame_queue_nb_remaining(FrameQueue *f)
 {
     return f->size - f->rindex_shown;
+}
+
+void frame_queue_unref_item(Frame *vp)
+{
+    av_frame_unref(vp->frame);
+    avsubtitle_free(&vp->sub);
 }
 
 /* return last shown position */
