@@ -2,15 +2,10 @@
 #define __PLAYGROUND_PACKET_QUEUE_H
 
 #include <stdint.h>
-
+#include <pthread.h>
 #include "libavcodec/avcodec.h"
 
-#include <SDL.h>
-#include <SDL_thread.h>
-
 #include "cmdutils.h"
-
-#include <assert.h>
 
 typedef struct PacketListNode {
     AVPacket pkt;
@@ -25,11 +20,9 @@ typedef struct PacketQueue {
     int64_t duration;
     int abort_request;
     int serial;
-    SDL_mutex *mutex;
-    SDL_cond *cond;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
 } PacketQueue;
-
-extern int packet_queue_put_private(PacketQueue *q, AVPacket *pkt);
 
 extern int packet_queue_put(PacketQueue *q, AVPacket *pkt);
 
