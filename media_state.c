@@ -32,19 +32,19 @@ extern int seek_by_bytes;
 extern int startup_volume;
 
 extern int fast;
-extern int genpts;
-extern int lowres;
+extern int gen_pts;
+extern int low_res;
 extern int autorotate;
 extern int find_stream_info;
 extern int filter_nbthreads;
-extern int autoexit;
+extern int auto_exit;
 extern int exit_on_keydown;
 extern int exit_on_mousedown;
 extern int loop;
-extern int framedrop;
+extern int frame_drop;
 extern int infinite_buffer;
 
-extern double rdftspeed;
+extern double rdft_speed;
 
 extern const char *audio_codec_name;
 extern const char *subtitle_codec_name;
@@ -302,7 +302,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
     int sample_rate, nb_channels;
     int64_t channel_layout;
     int ret = 0;
-    int stream_lowres = lowres;
+    int stream_lowres = low_res;
 
     if (stream_index < 0 || stream_index >= ic->nb_streams)
         return -1;
@@ -705,11 +705,11 @@ void video_refresh(void *opaque, double *remaining_time) {
 
     if (!display_disable && is->show_mode != SHOW_MODE_VIDEO && is->audio_st) {
         time = av_gettime_relative() / 1000000.0;
-        if (is->force_refresh || is->last_vis_time + rdftspeed < time) {
+        if (is->force_refresh || is->last_vis_time + rdft_speed < time) {
             video_display(is);
             is->last_vis_time = time;
         }
-        *remaining_time = FFMIN(*remaining_time, is->last_vis_time + rdftspeed - time);
+        *remaining_time = FFMIN(*remaining_time, is->last_vis_time + rdft_speed - time);
     }
 
     if (is->video_st) {
@@ -757,7 +757,7 @@ void video_refresh(void *opaque, double *remaining_time) {
             if (frame_queue_nb_remaining(&is->pic_q) > 1) {
                 Frame *nextvp = frame_queue_peek_next(&is->pic_q);
                 duration = vp_duration(is, vp, nextvp);
-                if (!is->step && (framedrop > 0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) &&
+                if (!is->step && (frame_drop > 0 || (frame_drop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) &&
                     time > is->frame_timer + duration) {
                     is->frame_drops_late++;
                     frame_queue_next(&is->pic_q);
@@ -896,7 +896,7 @@ static int get_video_frame(MediaState *is, AVFrame *frame) {
 
         frame->sample_aspect_ratio = av_guess_sample_aspect_ratio(is->ic, is->video_st, frame);
 
-        if (framedrop > 0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
+        if (frame_drop > 0 || (frame_drop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
             if (frame->pts != AV_NOPTS_VALUE) {
                 double diff = dpts - get_master_clock(is);
                 if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD &&
@@ -1724,7 +1724,7 @@ static int read_thread(void *arg) {
     }
     is->ic = ic;
 
-    if (genpts)
+    if (gen_pts)
         ic->flags |= AVFMT_FLAG_GENPTS;
 
     av_format_inject_global_side_data(ic);
@@ -1910,7 +1910,7 @@ static int read_thread(void *arg) {
                 if ((ret = av_packet_ref(&copy, &is->video_st->attached_pic)) < 0)
                     goto fail;
                 packet_queue_put(&is->video_q, &copy);
-                packet_queue_put_nullpacket(&is->video_q, is->video_stream);
+                packet_queue_put_null_packet(&is->video_q, is->video_stream);
             }
             is->queue_attachments_req = 0;
         }
@@ -1934,7 +1934,7 @@ static int read_thread(void *arg) {
              (is->video_dec.finished == is->video_q.serial && frame_queue_nb_remaining(&is->pic_q) == 0))) {
             if (loop != 1 && (!loop || --loop)) {
                 stream_seek(is, start_time != AV_NOPTS_VALUE ? start_time : 0, 0, 0);
-            } else if (autoexit) {
+            } else if (auto_exit) {
                 ret = AVERROR_EOF;
                 goto fail;
             }
@@ -1943,11 +1943,11 @@ static int read_thread(void *arg) {
         if (ret < 0) {
             if ((ret == AVERROR_EOF || avio_feof(ic->pb)) && !is->eof) {
                 if (is->video_stream >= 0)
-                    packet_queue_put_nullpacket(&is->video_q, is->video_stream);
+                    packet_queue_put_null_packet(&is->video_q, is->video_stream);
                 if (is->audio_stream >= 0)
-                    packet_queue_put_nullpacket(&is->audio_q, is->audio_stream);
+                    packet_queue_put_null_packet(&is->audio_q, is->audio_stream);
                 if (is->subtitle_stream >= 0)
-                    packet_queue_put_nullpacket(&is->subtitle_q, is->subtitle_stream);
+                    packet_queue_put_null_packet(&is->subtitle_q, is->subtitle_stream);
                 is->eof = 1;
             }
             if (ic->pb && ic->pb->error)

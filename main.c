@@ -80,24 +80,24 @@ int subtitle_disable;
 const char *wanted_stream_spec[AVMEDIA_TYPE_NB] = {0};
 int seek_by_bytes = -1;
 float seek_interval = 10;
-int borderless;
-int alwaysontop;
+int border_less;
+int always_on_top;
 int startup_volume = 100;
 
 int fast = 0;
-int genpts = 0;
-int lowres = 0;
+int gen_pts = 0;
+int low_res = 0;
 int autorotate = 1;
 int find_stream_info = 1;
 int filter_nbthreads = 0;
-int autoexit;
+int auto_exit;
 int exit_on_keydown;
 int exit_on_mousedown;
 int loop = 1;
-int framedrop = -1;
+int frame_drop = -1;
 int infinite_buffer = -1;
 
-double rdftspeed = 0.02;
+double rdft_speed = 0.02;
 int64_t cursor_last_shown;
 int cursor_hidden = 0;
 
@@ -381,25 +381,25 @@ static const OptionDef options[] = {
         {"seek_interval", OPT_FLOAT | HAS_ARG, {&seek_interval}, "set seek interval for left/right keys, in seconds",
          "seconds"},
         {"nodisp", OPT_BOOL, {&display_disable}, "disable graphical display"},
-        {"noborder", OPT_BOOL, {&borderless}, "borderless window"},
-        {"alwaysontop", OPT_BOOL, {&alwaysontop}, "window always on top"},
+        {"noborder", OPT_BOOL, {&border_less}, "borderless window"},
+        {"alwaysontop", OPT_BOOL, {&always_on_top}, "window always on top"},
         {"volume", OPT_INT | HAS_ARG, {&startup_volume}, "set startup volume 0=min 100=max", "volume"},
         {"f", HAS_ARG, {.func_arg = opt_format}, "force format", "fmt"},
         {"pix_fmt", HAS_ARG | OPT_EXPERT | OPT_VIDEO, {.func_arg = opt_frame_pix_fmt}, "set pixel format", "format"},
         {"stats", OPT_BOOL | OPT_EXPERT, {&show_status}, "show status", ""},
         {"fast", OPT_BOOL | OPT_EXPERT, {&fast}, "non spec compliant optimizations", ""},
-        {"genpts", OPT_BOOL | OPT_EXPERT, {&genpts}, "generate pts", ""},
+        {"genpts", OPT_BOOL | OPT_EXPERT, {&gen_pts}, "generate pts", ""},
         {"drp", OPT_INT | HAS_ARG | OPT_EXPERT, {&decoder_reorder_pts}, "let decoder reorder pts 0=off 1=on -1=auto",
          ""},
-        {"lowres", OPT_INT | HAS_ARG | OPT_EXPERT, {&lowres}, "", ""},
+        {"lowres", OPT_INT | HAS_ARG | OPT_EXPERT, {&low_res}, "", ""},
         {"sync", HAS_ARG | OPT_EXPERT, {.func_arg = opt_sync}, "set audio-video sync. type (type=audio/video/ext)",
          "type"},
-        {"autoexit", OPT_BOOL | OPT_EXPERT, {&autoexit}, "exit at the end", ""},
+        {"autoexit", OPT_BOOL | OPT_EXPERT, {&auto_exit}, "exit at the end", ""},
         {"exitonkeydown", OPT_BOOL | OPT_EXPERT, {&exit_on_keydown}, "exit on key down", ""},
         {"exitonmousedown", OPT_BOOL | OPT_EXPERT, {&exit_on_mousedown}, "exit on mouse down", ""},
         {"loop", OPT_INT | HAS_ARG | OPT_EXPERT, {&loop}, "set number of times the playback shall be looped",
          "loop count"},
-        {"framedrop", OPT_BOOL | OPT_EXPERT, {&framedrop}, "drop frames when cpu is too slow", ""},
+        {"framedrop", OPT_BOOL | OPT_EXPERT, {&frame_drop}, "drop frames when cpu is too slow", ""},
         {"infbuf", OPT_BOOL | OPT_EXPERT, {&infinite_buffer},
          "don't limit the input buffer size (useful with realtime streams)", ""},
         {"window_title", OPT_STRING | HAS_ARG, {&window_title}, "set window title", "window title"},
@@ -410,7 +410,7 @@ static const OptionDef options[] = {
         {"vf", OPT_EXPERT | HAS_ARG, {.func_arg = opt_add_vfilter}, "set video filters", "filter_graph"},
         {"af", OPT_STRING | HAS_ARG, {&afilters}, "set audio filters", "filter_graph"},
 #endif
-        {"rdftspeed", OPT_INT | HAS_ARG | OPT_AUDIO | OPT_EXPERT, {&rdftspeed}, "rdft speed", "msecs"},
+        {"rdftspeed", OPT_INT | HAS_ARG | OPT_AUDIO | OPT_EXPERT, {&rdft_speed}, "rdft speed", "msecs"},
         {"showmode", HAS_ARG, {.func_arg = opt_show_mode}, "select show mode (0 = video, 1 = waves, 2 = RDFT)", "mode"},
         {"default", HAS_ARG | OPT_AUDIO | OPT_VIDEO | OPT_EXPERT, {.func_arg = opt_default}, "generic catch all option",
          ""},
@@ -527,13 +527,13 @@ int main(int argc, char **argv) {
 
     if (!display_disable) {
         int flags = SDL_WINDOW_HIDDEN;
-        if (alwaysontop)
+        if (always_on_top)
 #if SDL_VERSION_ATLEAST(2, 0, 5)
             flags |= SDL_WINDOW_ALWAYS_ON_TOP;
 #else
         av_log(NULL, AV_LOG_WARNING, "Your SDL version doesn't support SDL_WINDOW_ALWAYS_ON_TOP. Feature will be inactive.\n");
 #endif
-        if (borderless)
+        if (border_less)
             flags |= SDL_WINDOW_BORDERLESS;
         else
             flags |= SDL_WINDOW_RESIZABLE;

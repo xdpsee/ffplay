@@ -33,7 +33,7 @@ extern int packet_queue_put_private(PacketQueue *q, AVPacket *pkt);
 
 extern int packet_queue_put(PacketQueue *q, AVPacket *pkt);
 
-extern int packet_queue_put_nullpacket(PacketQueue *q, int stream_index);
+extern int packet_queue_put_null_packet(PacketQueue *q, int stream_index);
 
 /* packet queue handling */
 extern int packet_queue_init(PacketQueue *q);
