@@ -19,6 +19,13 @@
 #include "packet_queue.h"
 #include "enums.h"
 
+/* no AV sync correction is done if below the minimum AV sync threshold */
+#define AV_SYNC_THRESHOLD_MIN 0.04
+/* AV sync correction is done if above the maximum AV sync threshold */
+#define AV_SYNC_THRESHOLD_MAX 0.1
+/* If a frame duration is longer than this, it will not be duplicated to compensate AV sync */
+#define AV_SYNC_FRAMEDUP_THRESHOLD 0.1
+/* no AV correction is done if too big error */
 
 /* NOTE: the size must be big enough to compensate the hardware audio buffersize size */
 /* TODO: We assume that a decoded and resampled frame fits into this buffer */
@@ -101,6 +108,7 @@ typedef struct MediaState {
     FFTSample *rdft_data;
     int xpos;
     double last_vis_time;
+
     SDL_Texture *vis_texture;
     SDL_Texture *sub_texture;
     SDL_Texture *vid_texture;
@@ -138,11 +146,9 @@ typedef struct MediaState {
     pthread_cond_t continue_read_thread;
 } MediaState;
 
-extern MediaState* stream_open(const char *filename, AVInputFormat *input_format);
+extern MediaState *stream_open(const char *filename, AVInputFormat *input_format);
 
 extern void stream_close(MediaState *is);
-
-extern void video_refresh(void *opaque, double *remaining_time);
 
 extern void toggle_full_screen(MediaState *is);
 
@@ -165,5 +171,19 @@ extern void stream_seek(MediaState *is, int64_t pos, int64_t rel, int seek_by_by
 extern void stream_toggle_pause(MediaState *is);
 
 extern double get_master_clock(MediaState *is);
+
+extern double compute_target_delay(double delay, MediaState *is);
+
+extern double vp_duration(MediaState *is, Frame *vp, Frame *nextvp);
+
+extern void update_video_pts(MediaState *is, double pts, int64_t pos, int serial);
+
+extern int get_master_sync_type(MediaState *is);
+
+extern void check_external_clock_speed(MediaState *is);
+
+extern int audio_decode_frame(MediaState *is);
+
+extern void update_sample_display(MediaState *is, short *samples, int samples_size);
 
 #endif //__PLAYGROUND_MEDIA_STATE_H
