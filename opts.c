@@ -5,6 +5,8 @@
 #include "opts.h"
 #include "enums.h"
 
+extern int64_t duration;
+
 /* options specified by the user */
 AVInputFormat *file_iformat;
 const char *input_filename;
@@ -80,7 +82,6 @@ int opt_seek(void *optctx, const char *opt, const char *arg) {
 }
 
 int opt_duration(void *optctx, const char *opt, const char *arg) {
-    extern int64_t duration;
     duration = parse_time_or_die(opt, arg, 1);
     return 0;
 }
