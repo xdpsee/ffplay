@@ -750,10 +750,10 @@ void video_refresh(void *opaque, double *remaining_time) {
             if (delay > 0 && time - is->frame_timer > AV_SYNC_THRESHOLD_MAX)
                 is->frame_timer = time;
 
-            SDL_LockMutex(is->pic_q.mutex);
+            pthread_mutex_lock(&is->pic_q.mutex);
             if (!isnan(vp->pts))
                 update_video_pts(is, vp->pts, vp->pos, vp->serial);
-            SDL_UnlockMutex(is->pic_q.mutex);
+            pthread_mutex_unlock(&is->pic_q.mutex);
 
             if (frame_queue_nb_remaining(&is->pic_q) > 1) {
                 Frame *nextvp = frame_queue_peek_next(&is->pic_q);

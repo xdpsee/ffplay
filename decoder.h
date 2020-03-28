@@ -16,7 +16,7 @@ typedef struct Decoder {
     int pkt_serial;
     int finished;
     int packet_pending;
-    SDL_cond *empty_queue_cond;
+    pthread_cond_t *empty_queue_cond;
     int64_t start_pts;
     AVRational start_pts_tb;
     int64_t next_pts;

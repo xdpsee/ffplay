@@ -18,7 +18,7 @@ int decoder_start(Decoder *d, int (*fn)(void *), const char *thread_name, void* 
     packet_queue_start(d->queue);
     int err = pthread_create(&d->decoder_tid, NULL, fn, arg);
     if (err) {
-        av_log(NULL, AV_LOG_ERROR, "SDL_CreateThread(): %s\n", SDL_GetError());
+        av_log(NULL, AV_LOG_ERROR, "pthread_create(): error");
         return AVERROR(ENOMEM);
     }
     return 0;
@@ -73,7 +73,7 @@ int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
 
         do {
             if (d->queue->nb_packets == 0)
-                SDL_CondSignal(d->empty_queue_cond);
+                pthread_cond_signal(d->empty_queue_cond);
             if (d->packet_pending) {
                 av_packet_move_ref(&pkt, &d->pkt);
                 d->packet_pending = 0;

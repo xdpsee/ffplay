@@ -3,13 +3,9 @@
 
 
 #include <stdint.h>
-
+#include <pthread.h>
 #include "libavutil/rational.h"
 
-#include <SDL.h>
-#include <SDL_thread.h>
-
-#include <assert.h>
 
 #include "packet_queue.h"
 
@@ -43,8 +39,8 @@ typedef struct FrameQueue {
     int max_size;
     int keep_last;
     int rindex_shown;
-    SDL_mutex *mutex;
-    SDL_cond *cond;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
     PacketQueue *pktq;
 } FrameQueue;
 

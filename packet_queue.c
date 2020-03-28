@@ -61,12 +61,12 @@ int packet_queue_init(PacketQueue *q)
     memset(q, 0, sizeof(PacketQueue));
     int err = pthread_mutex_init(&q->mutex, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): %s\n", SDL_GetError());
+        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): error\n");
         return AVERROR(ENOMEM);
     }
     err = pthread_cond_init(&q->cond, NULL);
     if (err) {
-        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): %s\n", SDL_GetError());
+        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): error\n");
         return AVERROR(ENOMEM);
     }
     q->abort_request = 1;

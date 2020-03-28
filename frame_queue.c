@@ -3,14 +3,18 @@
 
 int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last)
 {
-    int i;
+    int err, i;
     memset(f, 0, sizeof(FrameQueue));
-    if (!(f->mutex = SDL_CreateMutex())) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+
+    err = pthread_mutex_init(&f->mutex, NULL);
+    if (err) {
+        av_log(NULL, AV_LOG_FATAL, "pthread_mutex_init(): error");
         return AVERROR(ENOMEM);
     }
-    if (!(f->cond = SDL_CreateCond())) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+
+    err = pthread_cond_init(&f->cond, NULL);
+    if (err) {
+        av_log(NULL, AV_LOG_FATAL, "pthread_cond_init(): error");
         return AVERROR(ENOMEM);
     }
     f->pktq = pktq;
@@ -30,15 +34,15 @@ void frame_queue_destroy(FrameQueue *f)
         frame_queue_unref_item(vp);
         av_frame_free(&vp->frame);
     }
-    SDL_DestroyMutex(f->mutex);
-    SDL_DestroyCond(f->cond);
+    pthread_mutex_destroy(&f->mutex);
+    pthread_cond_destroy(&f->cond);
 }
 
 void frame_queue_signal(FrameQueue *f)
 {
-    SDL_LockMutex(f->mutex);
-    SDL_CondSignal(f->cond);
-    SDL_UnlockMutex(f->mutex);
+    pthread_mutex_lock(&f->mutex);
+    pthread_cond_signal(&f->cond);
+    pthread_mutex_unlock(&f->mutex);
 }
 
 Frame *frame_queue_peek(FrameQueue *f)
@@ -59,12 +63,12 @@ Frame *frame_queue_peek_last(FrameQueue *f)
 Frame *frame_queue_peek_writable(FrameQueue *f)
 {
     /* wait until we have space to put a new frame */
-    SDL_LockMutex(f->mutex);
+    pthread_mutex_lock(&f->mutex);
     while (f->size >= f->max_size &&
            !f->pktq->abort_request) {
-        SDL_CondWait(f->cond, f->mutex);
+        pthread_cond_wait(&f->cond, &f->mutex);
     }
-    SDL_UnlockMutex(f->mutex);
+    pthread_mutex_unlock(&f->mutex);
 
     if (f->pktq->abort_request)
         return NULL;
@@ -75,12 +79,12 @@ Frame *frame_queue_peek_writable(FrameQueue *f)
 Frame *frame_queue_peek_readable(FrameQueue *f)
 {
     /* wait until we have a readable a new frame */
-    SDL_LockMutex(f->mutex);
+    pthread_mutex_lock(&f->mutex);
     while (f->size - f->rindex_shown <= 0 &&
            !f->pktq->abort_request) {
-        SDL_CondWait(f->cond, f->mutex);
+        pthread_cond_wait(&f->cond, &f->mutex);
     }
-    SDL_UnlockMutex(f->mutex);
+    pthread_mutex_unlock(&f->mutex);
 
     if (f->pktq->abort_request)
         return NULL;
@@ -92,10 +96,10 @@ void frame_queue_push(FrameQueue *f)
 {
     if (++f->windex == f->max_size)
         f->windex = 0;
-    SDL_LockMutex(f->mutex);
+    pthread_mutex_lock(&f->mutex);
     f->size++;
-    SDL_CondSignal(f->cond);
-    SDL_UnlockMutex(f->mutex);
+    pthread_cond_signal(&f->cond);
+    pthread_mutex_unlock(&f->mutex);
 }
 
 void frame_queue_next(FrameQueue *f)
@@ -107,10 +111,10 @@ void frame_queue_next(FrameQueue *f)
     frame_queue_unref_item(&f->queue[f->rindex]);
     if (++f->rindex == f->max_size)
         f->rindex = 0;
-    SDL_LockMutex(f->mutex);
+    pthread_mutex_lock(&f->mutex);
     f->size--;
-    SDL_CondSignal(f->cond);
-    SDL_UnlockMutex(f->mutex);
+    pthread_cond_signal(&f->cond);
+    pthread_mutex_unlock(&f->mutex);
 }
 
 /* return the number of undisplayed frames in the queue */
