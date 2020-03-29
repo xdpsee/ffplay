@@ -72,7 +72,6 @@ static int configure_audio_filters(MediaState *is, const char *afilters, int for
 
 static int audio_thread(void *arg);
 
-int av_sync_type = AV_SYNC_AUDIO_MASTER;
 int64_t start_time = AV_NOPTS_VALUE;
 int64_t duration = AV_NOPTS_VALUE;
 

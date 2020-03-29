@@ -26,32 +26,11 @@
 #include <SDL_thread.h>
 
 #include "cmdutils.h"
-#include "packet_queue.h"
 #include "frame_queue.h"
 #include "sclock.h"
 #include "opts.h"
 #include "enums.h"
 #include "media_state.h"
-#include "utils.h"
-
-
-static void fill_rectangle(int x, int y, int w, int h);
-
-static int video_open(MediaState *is);
-
-static void video_refresh(void *opaque, double *remaining_time);
-
-static void video_display(MediaState *is);
-
-static void video_audio_display(MediaState *s);
-
-static void video_image_display(MediaState *is);
-
-static int
-realloc_texture(SDL_Texture **texture, Uint32 new_format, int new_width, int new_height, SDL_BlendMode blendmode,
-                int init_texture);
-
-void set_sdl_yuv_conversion_mode(AVFrame *frame);
 
 static void sdl_audio_callback(void *opaque, Uint8 *stream, int len);
 
@@ -65,8 +44,6 @@ const char program_name[] = "ffplay";
 const int program_birth_year = 2003;
 
 
-#define EXTERNAL_CLOCK_MIN_FRAMES 2
-#define EXTERNAL_CLOCK_MAX_FRAMES 10
 
 /* Step size for volume control in dB */
 #define SDL_VOLUME_STEP (0.75)
@@ -78,22 +55,15 @@ const int program_birth_year = 2003;
 
 #define CURSOR_HIDE_DELAY 1000000
 
-#define USE_ONEPASS_SUBTITLE_RENDER 1
 
 extern const char *input_filename;
 extern int decoder_reorder_pts;
 
-int screen_width = 0;
-int screen_height = 0;
-enum ShowMode show_mode = SHOW_MODE_NONE;
 
 const char *audio_codec_name;
-const char *subtitle_codec_name;
-const char *video_codec_name;
 
 
 int show_status = 1;
-const char *window_title;
 
 const char *wanted_stream_spec[AVMEDIA_TYPE_NB] = {0};
 int seek_by_bytes = -1;
@@ -105,14 +75,11 @@ int startup_volume = 100;
 int fast = 0;
 int gen_pts = 0;
 int low_res = 0;
-int autorotate = 1;
 int find_stream_info = 1;
 int filter_nbthreads = 0;
 int auto_exit;
 int exit_on_keydown;
-int exit_on_mousedown;
 int loop = 1;
-int frame_drop = -1;
 int infinite_buffer = -1;
 
 double rdft_speed = 0.02;
@@ -135,41 +102,6 @@ AVPacket flush_pkt;
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_RendererInfo renderer_info = {0};
-
-SDL_Texture *vis_texture;
-SDL_Texture *sub_texture;
-SDL_Texture *vid_texture;
-
-static const struct TextureFormatEntry {
-    enum AVPixelFormat format;
-    int texture_fmt;
-} sdl_texture_format_map[] = {
-        {AV_PIX_FMT_RGB8,           SDL_PIXELFORMAT_RGB332},
-        {AV_PIX_FMT_RGB444,         SDL_PIXELFORMAT_RGB444},
-        {AV_PIX_FMT_RGB555,         SDL_PIXELFORMAT_RGB555},
-        {AV_PIX_FMT_BGR555,         SDL_PIXELFORMAT_BGR555},
-        {AV_PIX_FMT_RGB565,         SDL_PIXELFORMAT_RGB565},
-        {AV_PIX_FMT_BGR565,         SDL_PIXELFORMAT_BGR565},
-        {AV_PIX_FMT_RGB24,          SDL_PIXELFORMAT_RGB24},
-        {AV_PIX_FMT_BGR24,          SDL_PIXELFORMAT_BGR24},
-        {AV_PIX_FMT_0RGB32,         SDL_PIXELFORMAT_RGB888},
-        {AV_PIX_FMT_0BGR32,         SDL_PIXELFORMAT_BGR888},
-        {AV_PIX_FMT_NE(RGB0, 0BGR), SDL_PIXELFORMAT_RGBX8888},
-        {AV_PIX_FMT_NE(BGR0, 0RGB), SDL_PIXELFORMAT_BGRX8888},
-        {AV_PIX_FMT_RGB32,          SDL_PIXELFORMAT_ARGB8888},
-        {AV_PIX_FMT_RGB32_1,        SDL_PIXELFORMAT_RGBA8888},
-        {AV_PIX_FMT_BGR32,          SDL_PIXELFORMAT_ABGR8888},
-        {AV_PIX_FMT_BGR32_1,        SDL_PIXELFORMAT_BGRA8888},
-        {AV_PIX_FMT_YUV420P,        SDL_PIXELFORMAT_IYUV},
-        {AV_PIX_FMT_YUYV422,        SDL_PIXELFORMAT_YUY2},
-        {AV_PIX_FMT_UYVY422,        SDL_PIXELFORMAT_UYVY},
-        {AV_PIX_FMT_NONE,           SDL_PIXELFORMAT_UNKNOWN},
-};
-
-
-static inline int compute_mod(int a, int b) {
-    return a < 0 ? a % b + b : a % b;
-}
 
 static void sigterm_handler(int sig) {
     exit(123);
@@ -317,8 +249,6 @@ int main(int argc, char **argv) {
     int flags;
     MediaState *is;
 
-    init_dynload();
-
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
     parse_loglevel(argc, argv, options);
 
@@ -363,37 +293,24 @@ int main(int argc, char **argv) {
     av_init_packet(&flush_pkt);
     flush_pkt.data = (uint8_t *) &flush_pkt;
 
-    if (1) {
-        int flags = SDL_WINDOW_HIDDEN;
-        if (always_on_top)
-#if SDL_VERSION_ATLEAST(2, 0, 5)
-            flags |= SDL_WINDOW_ALWAYS_ON_TOP;
-#else
-        av_log(NULL, AV_LOG_WARNING, "Your SDL version doesn't support SDL_WINDOW_ALWAYS_ON_TOP. Feature will be inactive.\n");
-#endif
-        if (border_less)
-            flags |= SDL_WINDOW_BORDERLESS;
-        else
-            flags |= SDL_WINDOW_RESIZABLE;
-        window = SDL_CreateWindow(program_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 100,
-                                  100, flags);
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-        if (window) {
-            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-            if (!renderer) {
-                av_log(NULL, AV_LOG_WARNING, "Failed to initialize a hardware accelerated renderer: %s\n",
-                       SDL_GetError());
-                renderer = SDL_CreateRenderer(window, -1, 0);
-            }
-            if (renderer) {
-                if (!SDL_GetRendererInfo(renderer, &renderer_info))
-                    av_log(NULL, AV_LOG_VERBOSE, "Initialized %s renderer.\n", renderer_info.name);
-            }
+    window = SDL_CreateWindow(program_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 100,
+                              100, SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS);
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+    if (window) {
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        if (!renderer) {
+            av_log(NULL, AV_LOG_WARNING, "Failed to initialize a hardware accelerated renderer: %s\n",
+                   SDL_GetError());
+            renderer = SDL_CreateRenderer(window, -1, 0);
         }
-        if (!window || !renderer || !renderer_info.num_texture_formats) {
-            av_log(NULL, AV_LOG_FATAL, "Failed to create window or renderer: %s", SDL_GetError());
-            do_exit(NULL);
+        if (renderer) {
+            if (!SDL_GetRendererInfo(renderer, &renderer_info))
+                av_log(NULL, AV_LOG_VERBOSE, "Initialized %s renderer.\n", renderer_info.name);
         }
+    }
+    if (!window || !renderer || !renderer_info.num_texture_formats) {
+        av_log(NULL, AV_LOG_FATAL, "Failed to create window or renderer: %s", SDL_GetError());
+        do_exit(NULL);
     }
 
     is = stream_open(input_filename, file_iformat);
