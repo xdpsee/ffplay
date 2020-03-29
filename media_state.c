@@ -9,11 +9,12 @@
 #include <libavutil/opt.h>
 #include <libavfilter/buffersrc.h>
 #include <libavutil/pixdesc.h>
+
+#include <SDL.h>
+
 #include "media_state.h"
 #include "opts.h"
 #include "utils.h"
-
-#include "media_state_callback.h"
 
 extern int screen_width;
 extern int screen_height;
@@ -385,7 +386,7 @@ static int stream_component_open(MediaState *is, int stream_index) {
             }
             if ((ret = decoder_start(&is->audio_dec, audio_thread, "audio_decoder", is)) < 0)
                 goto out;
-            media_state_pause_audio();
+            is ->pause_system_audio_proc(is);
             break;
         case AVMEDIA_TYPE_VIDEO:
             is->video_stream = stream_index;
@@ -445,7 +446,7 @@ void stream_close(MediaState *is) {
     sws_freeContext(is->sub_convert_ctx);
     av_free(is->filename);
 
-    media_state_stream_close();
+    is->stream_closed_callback(is);
 
     av_free(is);
 }
@@ -461,7 +462,7 @@ void stream_component_close(MediaState *is, int stream_index) {
     switch (codecpar->codec_type) {
         case AVMEDIA_TYPE_AUDIO:
             decoder_abort(&is->audio_dec, &is->sample_q);
-            media_state_close_audio();
+            is->close_system_audio_proc(is);
             decoder_destroy(&is->audio_dec);
             swr_free(&is->swr_ctx);
             av_freep(&is->audio_buf1);

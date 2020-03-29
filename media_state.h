@@ -11,8 +11,6 @@
 #include "libavformat/avformat.h"
 #include "libavcodec/avfft.h"
 
-#include <SDL.h>
-
 #include "sclock.h"
 #include "frame_queue.h"
 #include "decoder.h"
@@ -30,6 +28,10 @@
 /* NOTE: the size must be big enough to compensate the hardware audio buffersize size */
 /* TODO: We assume that a decoded and resampled frame fits into this buffer */
 #define SAMPLE_ARRAY_SIZE (8 * 65536)
+
+typedef void (*stream_closed_callback_proc)(void *);
+typedef void (*pause_system_audio_device_proc)(void *);
+typedef void (*close_system_audio_device_proc)(void *);
 
 typedef struct AudioParams {
     int freq;
@@ -140,6 +142,12 @@ typedef struct MediaState {
     int last_video_stream, last_audio_stream, last_subtitle_stream;
 
     pthread_cond_t continue_read_thread;
+
+
+    stream_closed_callback_proc stream_closed_callback;
+    pause_system_audio_device_proc pause_system_audio_proc;
+    close_system_audio_device_proc close_system_audio_proc;
+
 } MediaState;
 
 extern MediaState *stream_open(const char *filename, AVInputFormat *input_format);

@@ -28,7 +28,6 @@
 #include "cmdutils.h"
 #include "packet_queue.h"
 #include "frame_queue.h"
-#include "decoder.h"
 #include "sclock.h"
 #include "opts.h"
 #include "enums.h"
@@ -55,6 +54,11 @@ void set_sdl_yuv_conversion_mode(AVFrame *frame);
 
 static void sdl_audio_callback(void *opaque, Uint8 *stream, int len);
 
+static void media_audio_pause_callback(MediaState* state);
+
+static void media_audio_close_callback(MediaState* state);
+
+static void media_stream_closed_callback(MediaState* state);
 
 const char program_name[] = "ffplay";
 const int program_birth_year = 2003;
@@ -625,6 +629,10 @@ int main(int argc, char **argv) {
         do_exit(NULL);
     }
 
+    is->stream_closed_callback = media_stream_closed_callback;
+    is->pause_system_audio_proc = media_audio_pause_callback;
+    is->close_system_audio_proc = media_audio_close_callback;
+
     event_loop(is);
 
     /* never returns */
@@ -1187,7 +1195,7 @@ void fill_rectangle(int x, int y, int w, int h) {
     }
 }
 
-void media_state_stream_close() {
+void media_stream_closed_callback(MediaState* state) {
 
     if (vis_texture)
         SDL_DestroyTexture(vis_texture);
@@ -1209,14 +1217,13 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len);
 
 static SDL_AudioDeviceID audio_dev;
 
-void media_state_pause_audio() {
+void media_audio_pause_callback(MediaState* state) {
     SDL_PauseAudioDevice(audio_dev, 0);
 }
 
-void media_state_close_audio() {
+void media_audio_close_callback(MediaState* state) {
     SDL_CloseAudioDevice(audio_dev);
 }
-
 
 int audio_open(void *opaque, int64_t wanted_channel_layout, int wanted_nb_channels, int wanted_sample_rate,
                struct AudioParams *audio_hw_params) {

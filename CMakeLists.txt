@@ -11,7 +11,7 @@ set(SDL_DIR /usr/local/Cellar/sdl2/2.0.12)
 include_directories(${SDL_DIR}/include/SDL2/)
 link_directories(${SDL_DIR}/lib/)
 
-add_executable(ffplay main.c cmdutils.c packet_queue.c frame_queue.c decoder.c sclock.c opts.c media_state.c utils.c utils.h media_state_callback.h)
+add_executable(ffplay main.c cmdutils.c packet_queue.c frame_queue.c decoder.c sclock.c opts.c media_state.c utils.c utils.h)
 
 target_link_libraries(
         ffplay
